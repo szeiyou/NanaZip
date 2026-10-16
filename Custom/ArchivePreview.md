@@ -4,8 +4,10 @@
 包含文件夹和文件图标。不显示“单文件夹/散文件/混合内容”分类，也不要求逐级展开。
 
 Windows 11 下放在 NanaZip 的右键展开面板顶部，常用压缩/解压命令保留。
-预览项只读，不打开或解压文件。Windows 原生菜单决定图标列的对齐；
-标题通过缩进表达层级，不能保证与 Win10 自绘菜单逐像素一致。
+预览项只读，不打开或解压文件。文件/文件夹符号放在标题行内，按
+“缩进 → 📁/📄 → 空格 → 名称”排列；每层增加两个 en-space，图标与名称一起缩进。
+不再使用固定在左侧的原生图标列。行内符号由 Windows 字体渲染，颜色和造型依系统而定。
+文件条目为正常亮度，点击返回成功且不执行操作；标题、空包和不可预览等状态说明保留灰色。
 
 ## 范围与预算
 
@@ -26,7 +28,7 @@ Windows 11 下放在 NanaZip 的右键展开面板顶部，常用压缩/解压�
 `Custom/Build.ps1` 现在同时编译独立 Shell 扩展。源码在：
 
 - `NanaZip.UI.Modern/ArchivePreview.cpp` / `.h`：只读目录加载、树结构、展示截断。
-- `NanaZip.ShellExtension.cpp`：IExplorerCommand 慢路径、只读预览条目和 stock 图标。
+- `NanaZip.ShellExtension.cpp`：IExplorerCommand 慢路径、只读预览条目和随层级缩进的行内符号。
 - `Tests/ArchivePreviewTests.py`：真实 ZIP/7z/RAR4/RAR5、隐式目录、中文、空目录、限额、截断和加密头。
 - `Tests/ShellPreviewTests.cpp`：加载真实扩展 DLL，验证 E_PENDING 重试、菜单条目、缩进、图标及不可执行状态。
 

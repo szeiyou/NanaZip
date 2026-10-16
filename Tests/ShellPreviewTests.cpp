@@ -52,24 +52,29 @@ int wmain(int argc, wchar_t** argv)
         if (FAILED(command->GetTitle(selection,&title)) || !title) return 11;
         std::wstring name(title); CoTaskMemFree(title);
         command->GetState(selection,FALSE,&state);
-        if (state != ECS_DISABLED || command->Invoke(selection,nullptr) != E_NOTIMPL) return 12;
         unsigned indent = 0;
         while (indent < name.size() && name[indent] == L'\x2002') ++indent;
-        if (indent)
+        bool row = name.compare(indent,3,L"\U0001F4C1 ") == 0 || name.compare(indent,3,L"\U0001F4C4 ") == 0;
+        const EXPCMDSTATE expectedState = row ? ECS_ENABLED : ECS_DISABLED;
+        if (state != expectedState || command->Invoke(selection,nullptr) != S_OK) return 12;
+        if (row)
         {
-            names.push_back(name.substr(indent)); indents.push_back(indent);
+            names.push_back(name.substr(indent + 3)); indents.push_back(indent);
+            icons.push_back(name.substr(indent,2));
             LPWSTR icon = nullptr;
-            if (FAILED(command->GetIcon(selection,&icon)) || !icon || !*icon) return 13;
-            icons.push_back(icon); CoTaskMemFree(icon);
+            // No separate native icon: the glyph follows the text indentation.
+            if (command->GetIcon(selection,&icon) != E_NOTIMPL || icon) return 13;
         }
         command->Release();
     }
     if (names.size() != 6 || names[0] != L"\u9879\u76ee" || names[2] != L"a.png" ||
         names[3] != L"setup.exe" || names[4] != L"\u8bf4\u660e.txt" ||
-        indents != std::vector<unsigned>({2,4,6,4,2,2}) || icons[0] == icons[2]) return 14;
+        indents != std::vector<unsigned>({0,2,4,2,0,0}) || icons[0] != L"\U0001F4C1" ||
+        icons[1] != icons[0] || icons[5] != icons[0] || icons[2] != L"\U0001F4C4" ||
+        icons[3] != icons[2] || icons[4] != icons[2]) return 14;
     enumerator->Release(); selection->Release(); root->Release();
     CoUninitialize();
     // The wrapper may hold a cached Modern module; process exit does the cleanup.
-    printf("PASS: actual Shell COM menu rows, indentation, distinct folder/file icons, disabled preview and E_PENDING retry\n");
+    printf("PASS: actual Shell COM rows with inline folder/file glyphs, shared indentation, readable no-op entries, dimmed labels and E_PENDING retry\n");
     return 0;
 }

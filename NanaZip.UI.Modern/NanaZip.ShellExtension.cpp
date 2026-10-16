@@ -211,6 +211,8 @@ namespace NanaZip::ShellExtension
     using SubCommandList = std::vector<winrt::com_ptr<IExplorerCommand>>;
     using SubCommandListIterator = SubCommandList::const_iterator;
 
+    enum class PreviewItemKind { None, Label, Entry };
+
     struct ExplorerCommandBase : public winrt::implements<
         ExplorerCommandBase,
         IExplorerCommand>
@@ -221,8 +223,7 @@ namespace NanaZip::ShellExtension
 
         DWORD m_CommandID;
         bool m_IsSeparator;
-        bool m_IsPreview;
-        std::wstring m_Icon;
+        PreviewItemKind m_PreviewKind;
         CBoolPair m_ElimDup;
         UInt32 m_WriteZone;
 
@@ -233,16 +234,14 @@ namespace NanaZip::ShellExtension
             DWORD CommandID = CommandID::None,
             CBoolPair const& ElimDup = CBoolPair(),
             UInt32 const& WriteZone = static_cast<UInt32>(-1),
-            bool IsPreview = false,
-            std::wstring const& Icon = std::wstring()) :
+            PreviewItemKind PreviewKind = PreviewItemKind::None) :
             m_Title(Title),
             m_CommandID(CommandID),
             m_ElimDup(ElimDup),
             m_WriteZone(WriteZone),
-            m_IsPreview(IsPreview),
-            m_Icon(Icon)
+            m_PreviewKind(PreviewKind)
         {
-            this->m_IsSeparator = (this->m_CommandID == CommandID::None && !IsPreview);
+            this->m_IsSeparator = (this->m_CommandID == CommandID::None && PreviewKind == PreviewItemKind::None);
         }
 
 #pragma region IExplorerCommand
@@ -268,8 +267,8 @@ namespace NanaZip::ShellExtension
         {
             UNREFERENCED_PARAMETER(psiItemArray);
 
-            if (this->m_IsPreview && !this->m_Icon.empty())
-                return ::SHStrDupW(this->m_Icon.c_str(), ppszIcon);
+            // Preview glyphs are inline with their titles so they share the
+            // hierarchy indentation, instead of Explorer's fixed icon column.
             *ppszIcon = nullptr;
             return E_NOTIMPL;
         }
@@ -297,7 +296,9 @@ namespace NanaZip::ShellExtension
         {
             UNREFERENCED_PARAMETER(psiItemArray);
             UNREFERENCED_PARAMETER(fOkToBeSlow);
-            *pCmdState = this->m_IsPreview ? ECS_DISABLED : ECS_ENABLED;
+            // Entries retain normal text contrast. Only section/status labels
+            // are dimmed; all preview items remain no-ops in Invoke.
+            *pCmdState = this->m_PreviewKind == PreviewItemKind::Label ? ECS_DISABLED : ECS_ENABLED;
             return S_OK;
         }
 
@@ -307,7 +308,11 @@ namespace NanaZip::ShellExtension
         {
             UNREFERENCED_PARAMETER(pbc);
 
-            if (this->m_IsSeparator || this->m_IsPreview)
+            if (this->m_PreviewKind != PreviewItemKind::None)
+            {
+                return S_OK;
+            }
+            if (this->m_IsSeparator)
             {
                 return E_NOTIMPL;
             }
@@ -638,10 +643,10 @@ namespace NanaZip::ShellExtension
                 : PRIMARYLANGID(GetUserDefaultUILanguage()) == LANG_CHINESE;
             auto text = [chinese](const wchar_t* en, const wchar_t* zh) { return std::wstring(chinese ? zh : en); };
             SubCommandList commands;
-            auto add = [&](const std::wstring& title, const std::wstring& icon = std::wstring())
+            auto add = [&](const std::wstring& title, bool entry = false)
             {
                 commands.push_back(winrt::make<ExplorerCommandBase>(title, CommandID::None,
-                    CBoolPair(), static_cast<UInt32>(-1), true, icon));
+                    CBoolPair(), static_cast<UInt32>(-1), entry ? PreviewItemKind::Entry : PreviewItemKind::Label));
             };
             add(text(L"Archive contents", L"\u538b\u7f29\u6587\u4ef6\u9884\u89c8"));
             if (preview->State == Preview::Status::Ready)
@@ -650,13 +655,10 @@ namespace NanaZip::ShellExtension
                 if (rows.Items.empty()) add(text(L"(Empty archive)", L"\uff08\u7a7a\u538b\u7f29\u5305\uff09"));
                 for (const auto& row : rows.Items)
                 {
-                    SHSTOCKICONINFO info = {}; info.cbSize = sizeof(info);
-                    std::wstring icon;
-                    if (SUCCEEDED(SHGetStockIconInfo(row.Directory ? SIID_FOLDER : SIID_DOCNOASSOC, SHGSI_ICONLOCATION, &info)))
-                        icon = std::wstring(info.szPath) + L"," + std::to_wstring(info.iIcon);
                     std::wstring name;
                     for (wchar_t c : row.Name) { name += c; if (c == L'&') name += c; }
-                    add(std::wstring((row.Depth + 1) * 2, L'\x2002') + name, icon);
+                    const wchar_t* glyph = row.Directory ? L"\U0001F4C1 " : L"\U0001F4C4 ";
+                    add(std::wstring(row.Depth * 2, L'\x2002') + glyph + name, true);
                 }
                 if (rows.Truncated) add(text(L"... more items", L"\u2026\u5176\u4ed6\u5185\u5bb9"));
             }
