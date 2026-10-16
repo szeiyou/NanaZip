@@ -27,4 +27,5 @@ $lines = @('@echo off', ('call "' + $tools.VcVars + '" >nul'), 'if errorlevel 1 
 [IO.File]::WriteAllLines($batch, $lines, [Text.Encoding]::Default)
 Invoke-CustomNative 'cmd.exe' @('/d','/c',$batch)
 Invoke-CustomNative $testExe @($core, $fixture)
+& (Join-Path $script:CustomRepoRoot 'Tests\BuildArchivePreviewTests.ps1')
 Write-Host 'PASS: custom build tests, installer states, ZIP integration and direct archive callbacks.'

@@ -16,6 +16,9 @@
 #include <shobjidl_core.h>
 
 #include <winrt/Windows.Foundation.h>
+#include <atomic>
+#include <memory>
+#include "ArchivePreview.h"
 
 #include "../SevenZip/CPP/Common/Common.h"
 #include "../SevenZip/CPP/Windows/DLL.h"
@@ -218,6 +221,8 @@ namespace NanaZip::ShellExtension
 
         DWORD m_CommandID;
         bool m_IsSeparator;
+        bool m_IsPreview;
+        std::wstring m_Icon;
         CBoolPair m_ElimDup;
         UInt32 m_WriteZone;
 
@@ -227,13 +232,17 @@ namespace NanaZip::ShellExtension
             std::wstring const& Title = std::wstring(),
             DWORD CommandID = CommandID::None,
             CBoolPair const& ElimDup = CBoolPair(),
-            UInt32 const& WriteZone = static_cast<UInt32>(-1)) :
+            UInt32 const& WriteZone = static_cast<UInt32>(-1),
+            bool IsPreview = false,
+            std::wstring const& Icon = std::wstring()) :
             m_Title(Title),
             m_CommandID(CommandID),
             m_ElimDup(ElimDup),
-            m_WriteZone(WriteZone)
+            m_WriteZone(WriteZone),
+            m_IsPreview(IsPreview),
+            m_Icon(Icon)
         {
-            this->m_IsSeparator = (this->m_CommandID == CommandID::None);
+            this->m_IsSeparator = (this->m_CommandID == CommandID::None && !IsPreview);
         }
 
 #pragma region IExplorerCommand
@@ -259,6 +268,8 @@ namespace NanaZip::ShellExtension
         {
             UNREFERENCED_PARAMETER(psiItemArray);
 
+            if (this->m_IsPreview && !this->m_Icon.empty())
+                return ::SHStrDupW(this->m_Icon.c_str(), ppszIcon);
             *ppszIcon = nullptr;
             return E_NOTIMPL;
         }
@@ -286,7 +297,7 @@ namespace NanaZip::ShellExtension
         {
             UNREFERENCED_PARAMETER(psiItemArray);
             UNREFERENCED_PARAMETER(fOkToBeSlow);
-            *pCmdState = ECS_ENABLED;
+            *pCmdState = this->m_IsPreview ? ECS_DISABLED : ECS_ENABLED;
             return S_OK;
         }
 
@@ -296,7 +307,7 @@ namespace NanaZip::ShellExtension
         {
             UNREFERENCED_PARAMETER(pbc);
 
-            if (this->m_IsSeparator)
+            if (this->m_IsSeparator || this->m_IsPreview)
             {
                 return E_NOTIMPL;
             }
@@ -583,6 +594,77 @@ namespace NanaZip::ShellExtension
         bool m_Initialized = false;
         SubCommandList m_SubCommands;
         SubCommandListIterator m_CurrentSubCommand;
+        std::atomic<bool> m_PreviewStarted{false};
+        std::shared_ptr<const Preview::Result> m_Preview;
+        bool m_PreviewAdded = false;
+
+        HRESULT PreparePreview(IShellItemArray* selection, BOOL allowSlow)
+        {
+            if (std::atomic_load(&m_Preview) || !selection) return S_OK;
+            try
+            {
+                DWORD count = 0;
+                if (FAILED(selection->GetCount(&count)) || count != 1) return S_OK;
+                winrt::com_ptr<IShellItem> item;
+                if (FAILED(selection->GetItemAt(0, item.put()))) return S_OK;
+                // ZIPs can report SFGAO_FOLDER because Explorer exposes them as
+                // virtual folders. The slow reader checks physical attributes.
+                LPWSTR raw = nullptr;
+                if (FAILED(item->GetDisplayName(SIGDN_FILESYSPATH, &raw))) return S_OK;
+                std::unique_ptr<wchar_t, decltype(&::CoTaskMemFree)> owned(raw, ::CoTaskMemFree);
+                std::wstring path(raw);
+                if (!Preview::Supports(path)) return S_OK;
+                // Reserve metadata reads for Explorer's permitted slow-state query.
+                if (!allowSlow) return E_PENDING;
+                if (m_PreviewStarted.exchange(true)) return std::atomic_load(&m_Preview) ? S_OK : E_PENDING;
+                auto prefix = NWindows::NDLL::GetModuleDirPrefix();
+                auto value = std::make_shared<const Preview::Result>(Preview::Read(path,
+                    std::wstring(prefix.Ptr()) + L"NanaZip.Core.dll"));
+                std::atomic_store(&m_Preview, value);
+                return S_OK;
+            }
+            catch (...) { m_PreviewStarted = false; return winrt::to_hresult(); }
+        }
+
+        void AddPreviewCommands()
+        {
+            if (m_PreviewAdded) return;
+            auto preview = std::atomic_load(&m_Preview);
+            if (!preview) return;
+            m_PreviewAdded = true;
+            if (preview->State == Preview::Status::Unsupported) return;
+            bool chinese = g_LangID.Len() >= 2
+                ? (g_LangID[0] == L'z' && g_LangID[1] == L'h')
+                : PRIMARYLANGID(GetUserDefaultUILanguage()) == LANG_CHINESE;
+            auto text = [chinese](const wchar_t* en, const wchar_t* zh) { return std::wstring(chinese ? zh : en); };
+            SubCommandList commands;
+            auto add = [&](const std::wstring& title, const std::wstring& icon = std::wstring())
+            {
+                commands.push_back(winrt::make<ExplorerCommandBase>(title, CommandID::None,
+                    CBoolPair(), static_cast<UInt32>(-1), true, icon));
+            };
+            add(text(L"Archive contents", L"\u538b\u7f29\u6587\u4ef6\u9884\u89c8"));
+            if (preview->State == Preview::Status::Ready)
+            {
+                auto rows = Preview::Flatten(*preview);
+                if (rows.Items.empty()) add(text(L"(Empty archive)", L"\uff08\u7a7a\u538b\u7f29\u5305\uff09"));
+                for (const auto& row : rows.Items)
+                {
+                    SHSTOCKICONINFO info = {}; info.cbSize = sizeof(info);
+                    std::wstring icon;
+                    if (SUCCEEDED(SHGetStockIconInfo(row.Directory ? SIID_FOLDER : SIID_DOCNOASSOC, SHGSI_ICONLOCATION, &info)))
+                        icon = std::wstring(info.szPath) + L"," + std::to_wstring(info.iIcon);
+                    std::wstring name;
+                    for (wchar_t c : row.Name) { name += c; if (c == L'&') name += c; }
+                    add(std::wstring((row.Depth + 1) * 2, L'\x2002') + name, icon);
+                }
+                if (rows.Truncated) add(text(L"... more items", L"\u2026\u5176\u4ed6\u5185\u5bb9"));
+            }
+            else add(text(L"(Preview unavailable; open archive to view)",
+                L"\uff08\u6682\u65e0\u6cd5\u9884\u89c8\uff0c\u8bf7\u6253\u5f00\u538b\u7f29\u5305\u67e5\u770b\uff09"));
+            commands.push_back(winrt::make<ExplorerCommandBase>());
+            m_SubCommands.insert(m_SubCommands.begin(), commands.begin(), commands.end());
+        }
 
         void Initialize(
             _In_opt_ IShellItemArray* psiItemArray)
@@ -973,10 +1055,8 @@ namespace NanaZip::ShellExtension
             _In_ BOOL fOkToBeSlow,
             _Out_ EXPCMDSTATE* pCmdState)
         {
-            UNREFERENCED_PARAMETER(psiItemArray);
-            UNREFERENCED_PARAMETER(fOkToBeSlow);
             *pCmdState = ECS_ENABLED;
-            return S_OK;
+            return PreparePreview(psiItemArray, fOkToBeSlow);
         }
 
         HRESULT STDMETHODCALLTYPE Invoke(
@@ -998,6 +1078,8 @@ namespace NanaZip::ShellExtension
         HRESULT STDMETHODCALLTYPE EnumSubCommands(
             _Outptr_ IEnumExplorerCommand** ppEnum)
         {
+            try { AddPreviewCommands(); }
+            catch (...) { return winrt::to_hresult(); }
             if (this->m_SubCommands.empty())
             {
                 *ppEnum = nullptr;

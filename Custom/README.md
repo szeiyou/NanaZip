@@ -5,6 +5,7 @@
 - [更新日志](CHANGELOG.md)：本地功能、修复和限制，也随新安装 ZIP 分发。
 - [上游合并方法](UPSTREAM.md)：更新 main，再合并进自用分支。
 - [性能记录](../Documents/ZipPerformance.md)与[安装故障记录](../Documents/WindowsInstallation.md)。
+- [右键文件树预览](ArchivePreview.md)：显示方式、格式范围和验证限制。
 
 ## 日常构建
 
@@ -49,8 +50,10 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Custom\Build.ps1 -Vers
 
 **当前流程编译优化核心，复用已有 GUI，并非完整 GUI 源码构建。**
 当前 Build Tools 缺少可用的 DesktopBridge/UWP XAML 构建支持，完整现代 GUI 构建此前未通过。
-因此保留来源包的 GUI、中文资源、Shell 扩展、K7Base、原版命令行，只替换新编译的
-Core、Codecs、ZS.Codecs 三个 DLL。“关于”可能仍显示来源版本，包版本以 build-info.json 为准。
+因此保留来源包的 GUI、中文资源、K7Base、K7User、原版命令行，替换新编译的
+Core、Codecs、ZS.Codecs 和 ShellExtension 四个 DLL。
+右键扩展通过动态包装器复用 Modern DLL，不依赖重新生成 XAML 工程。
+“关于”可能仍显示来源版本，包版本以 build-info.json 为准。
 
 可以固定一个界面来源目录，保留该目录及版本以便复现：
 
@@ -85,7 +88,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Custom\Package.ps1
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Custom\Verify.ps1 -DistributionDirectory '.\Output\Custom\7.0.1870.1\Distribution'
 ```
 
-单独 Package 核对编译记录、源码指纹和三个 DLL 的哈希；缺少记录、源码改动或 DLL 被替换时会拒绝。
+单独 Package 核对编译记录、源码指纹和四个 DLL 的哈希；缺少记录、源码改动或 DLL 被替换时会拒绝。
 未通过完整回归也不能被标记为通过。修改源码后请先用 Build，避免拿旧 DLL 打包。
 校验包括身份、架构、版本、块哈希、运行时及保留界面哈希、Windows SIP 内容验证、
 内外两层签名与证书指纹，并拒绝块映射和清单未包含的额外成员。

@@ -8,11 +8,12 @@ New-Item -ItemType Directory -Path $logs -Force | Out-Null
 $target = if ($Rebuild) { 'Rebuild' } else { 'Build' }
 Push-Location $script:CustomRepoRoot
 try {
-    foreach ($project in @('NanaZip.Core\NanaZip.Core.vcxproj', 'NanaZip.Universal\NanaZip.Universal.Console.vcxproj')) {
+    foreach ($project in @('NanaZip.Core\NanaZip.Core.vcxproj', 'NanaZip.Universal\NanaZip.Universal.Console.vcxproj',
+        'NanaZip.UI.Modern\NanaZip.ShellExtension.vcxproj')) {
         Write-Host ('Building ' + $project)
         $logName = [IO.Path]::GetFileNameWithoutExtension($project) + '.binlog'
         Invoke-CustomNative $tools.MSBuild @($project, '/restore', ('/t:' + $target), '/m', '/v:minimal',
-            '/p:Configuration=Release', '/p:Platform=x64', '/p:PreferredToolArchitecture=x64',
+            '/p:Configuration=Release', '/p:Platform=x64', '/p:PreferredToolArchitecture=x64', '/p:NanaZipShellStandalone=true',
             ('/bl:' + (Join-Path $logs $logName)))
     }
     $state = Get-CustomSourceState

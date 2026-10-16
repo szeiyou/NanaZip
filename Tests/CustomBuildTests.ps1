@@ -17,7 +17,7 @@ $temporary = Join-Path $PSScriptRoot ('..\Output\Custom\Tests\provenance-' + [gu
 New-Item -ItemType Directory -Path $temporary -Force | Out-Null
 $temporary = (Resolve-Path -LiteralPath $temporary).Path
 try {
-    foreach ($name in @('NanaZip.Core.dll','NanaZip.Codecs.dll','NanaZip.ZS.Codecs.dll')) {
+    foreach ($name in @('NanaZip.Core.dll','NanaZip.Codecs.dll','NanaZip.ZS.Codecs.dll','NanaZip.ShellExtension.dll')) {
         [IO.File]::WriteAllText((Join-Path $temporary $name), 'original test bytes')
     }
     $recordPath = Join-Path $temporary 'runtime-build.json'

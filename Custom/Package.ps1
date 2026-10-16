@@ -37,14 +37,14 @@ Get-ChildItem -LiteralPath $interfaceRoot | Where-Object Name -NotIn $excluded |
     Copy-Item -LiteralPath $_.FullName -Destination $payload -Recurse
 }
 $runtimeHashes = [ordered]@{}
-foreach ($runtime in @('NanaZip.Core.dll','NanaZip.Codecs.dll','NanaZip.ZS.Codecs.dll')) {
+foreach ($runtime in @('NanaZip.Core.dll','NanaZip.Codecs.dll','NanaZip.ZS.Codecs.dll','NanaZip.ShellExtension.dll')) {
     $built = Join-Path $script:CustomRepoRoot ('Output\Binaries\Release\x64\' + $runtime)
     if (-not (Test-Path -LiteralPath $built)) { throw ('Build first; missing runtime: ' + $built) }
     Copy-Item -LiteralPath $built -Destination (Join-Path $payload $runtime) -Force
     $runtimeHashes[$runtime] = (Get-FileHash -LiteralPath $built -Algorithm SHA256).Hash
 }
 $interfaceHashes = [ordered]@{}
-foreach ($file in @('NanaZip.Modern.FileManager.exe','NanaZip.Modern.dll','NanaZip.ShellExtension.dll','NanaZip.Universal.Console.exe','K7Base.dll','resources.pri')) {
+foreach ($file in @('NanaZip.Modern.FileManager.exe','NanaZip.Modern.dll','NanaZip.Universal.Console.exe','K7Base.dll','K7User.dll','resources.pri')) {
     $path = Join-Path $interfaceRoot $file
     if (-not (Test-Path -LiteralPath $path)) { throw ('Interface source is incomplete: ' + $file) }
     $interfaceHashes[$file] = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash
@@ -56,6 +56,11 @@ $manifest.Save((Join-Path $payload 'AppxManifest.xml'))
 if (-not $SkipTests) {
     Invoke-CustomNative $tools.Python @((Join-Path $script:CustomRepoRoot 'Tests\ZipParallelTests.py'),
         (Join-Path $payload 'NanaZip.Universal.Console.exe'))
+    $binaryRoot = Join-Path $script:CustomRepoRoot 'Output\Binaries\Release\x64'
+    Invoke-CustomNative $tools.Python @((Join-Path $script:CustomRepoRoot 'Tests\ArchivePreviewTests.py'),
+        (Join-Path $binaryRoot 'ArchivePreviewProbe.exe'),(Join-Path $payload 'NanaZip.Core.dll'),
+        (Join-Path $payload 'NanaZip.Universal.Console.exe'),(Join-Path $binaryRoot 'ShellPreviewTests.exe'),
+        (Join-Path $payload 'NanaZip.ShellExtension.dll'))
 }
 $inner = Join-Path $bundleInput ('NanaZipPreview-Custom-' + $Version + '-x64.msix')
 $packageName = 'NanaZipPreview-Custom-' + $Version + '-x64.msixbundle'
@@ -82,7 +87,7 @@ $details = [ordered]@{
     PackageIdentity=[string]$manifest.Package.Identity.Name; Publisher=[string]$manifest.Package.Identity.Publisher
     CertificateThumbprint=$signing.Thumbprint; SourceCommit=$record.SourceCommit; SourceBranch=$record.SourceBranch
     SourceDirty=$record.SourceDirty; SourceFingerprint=$record.SourceFingerprint; BuiltAtUtc=[DateTime]::UtcNow.ToString('o')
-    InterfaceSourceVersion=$sourceVersion; InterfaceSource='Existing modern Preview package; GUI not rebuilt from source'
+    InterfaceSourceVersion=$sourceVersion; InterfaceSource='Existing modern Preview GUI/resources; shell and archive runtime built from source'
     RuntimeSHA256=$runtimeHashes; PreservedInterfaceSHA256=$interfaceHashes
     OptimizedCoreSHA256=$runtimeHashes['NanaZip.Core.dll']; RegressionTestsRun=((-not $SkipTests) -and $record.FullRegressionTestsPassed)
     ActualInstallationTested=$false

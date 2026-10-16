@@ -304,6 +304,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="NanaZip.ShellExtension.cpp" />
+    <ClCompile Include="ArchivePreview.cpp" />
+    <ClInclude Include="ArchivePreview.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="NanaZip.ShellExtension.def" />

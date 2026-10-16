@@ -76,7 +76,7 @@ function Get-CustomSourceState {
 function Get-CustomRuntimeHashes {
     param([string]$BinaryDirectory)
     $result = [ordered]@{}
-    foreach ($name in @('NanaZip.Core.dll','NanaZip.Codecs.dll','NanaZip.ZS.Codecs.dll')) {
+    foreach ($name in @('NanaZip.Core.dll','NanaZip.Codecs.dll','NanaZip.ZS.Codecs.dll','NanaZip.ShellExtension.dll')) {
         $result[$name] = (Get-FileHash -LiteralPath (Join-Path $BinaryDirectory $name) -Algorithm SHA256).Hash
     }
     return $result
