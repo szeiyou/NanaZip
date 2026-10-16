@@ -12,6 +12,10 @@ NanaZip Preview 自用 ZIP 优化版（Windows x64，现代界面）
 本程序不会自动卸载应用、结束压缩任务、重启资源管理器或关机。
 错误会记录在同目录的 Install-日期时间.log；请连同 .events.xml 保留。
 
+升级时如果没有 NanaZip 任务/窗口，安装程序会仅释放已确认属于当前 NanaZip 包的
+空闲右键 COM 宿主，避免关闭主窗口后仍一直 pending。它会核对 COM 类、会话、
+可执行文件路径和已加载模块，不会结束其他 COM 进程或 Explorer。
+
 本包复用现有 NanaZip Preview 的现代界面和中文资源，
 从自用分支源码编译 ZIP 优化核心、匹配的 Codec 插件和现代右键扩展。
 选中单个 ZIP、7z 或 RAR，在 NanaZip 右键面板中可查看带图标与缩进的内容树。

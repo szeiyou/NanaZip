@@ -76,6 +76,10 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Custom\Build.ps1 -Inte
   持续占用时，在方便时注销或重启，再确认版本。
 - 失败：保留安装目录内的 `.log`、`.events.xml` 按具体原因排查。
 
+升级前，安装程序会在没有 NanaZip 任务/窗口时，释放已确认加载当前包扩展的空闲 COM 菜单宿主。
+核对项包含 COM 类、会话、System32 可执行文件路径和当前包的扩展模块；不会结束其他 COM 进程或 Explorer。
+有任务运行或无法确认宿主身份时继续使用延迟注册。
+
 构建不会自动安装、导入证书、结束任务、注销或关机。
 此前 7.0.1870.0 的注册及核心哈希已确认；本流程的新包不会自动安装，
 现代 GUI 启动仍需实测，每份 build-info.json 初始标记未做安装测试。

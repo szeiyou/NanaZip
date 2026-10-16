@@ -1,4 +1,39 @@
 $ErrorActionPreference = 'Stop'
+function Stop-IdleNanaZipShellHosts {
+    param($InstalledPackage)
+    if (-not $InstalledPackage) { return }
+    if (@(Get-Process -Name 'NanaZip.Modern.FileManager','NanaZip.Universal.Windows','NanaZip.Universal.Console' -ErrorAction SilentlyContinue).Count) {
+        Write-Host 'NanaZip jobs/windows are running; leave shell hosts untouched and defer the update.'
+        return
+    }
+    $session = (Get-Process -Id $PID -ErrorAction Stop).SessionId
+    $expectedExecutable = Join-Path $env:windir 'System32\dllhost.exe'
+    $expectedModule = Join-Path $InstalledPackage.InstallLocation 'NanaZip.ShellExtension.dll'
+    try {
+        $hosts = @(Get-CimInstance Win32_Process -Filter "Name='dllhost.exe'" -ErrorAction Stop)
+    } catch {
+        Write-Host 'Could not inspect NanaZip shell hosts; use deferred registration.'
+        return
+    }
+    foreach ($candidate in $hosts) {
+        # The shell COM class is shared with the package manifest. Match the
+        # whole command, session, executable and loaded package module, not a PID.
+        if ($candidate.CommandLine -notmatch '(?i)^"?[^"\r\n]*\\dllhost\.exe"?\s+/Processid:\{469D94E9-6AF4-4395-B396-99B1308F8CE5\}\s*$') { continue }
+        try {
+            $process = Get-Process -Id $candidate.ProcessId -ErrorAction Stop
+            if ($process.SessionId -ne $session -or $process.Path -ne $expectedExecutable) { continue }
+            if (-not @($process.Modules | Where-Object FileName -EQ $expectedModule).Count) { continue }
+            # Recheck active jobs immediately before releasing the idle COM host.
+            if (@(Get-Process -Name 'NanaZip.Modern.FileManager','NanaZip.Universal.Windows','NanaZip.Universal.Console' -ErrorAction SilentlyContinue).Count) { return }
+            $null = $process.Handle
+            Write-Host ('Releasing idle NanaZip context-menu host: ' + $process.Id)
+            Stop-Process -InputObject $process -Force -ErrorAction Stop
+            if (-not $process.WaitForExit(5000)) { Write-Host 'Shell host did not exit yet; update may remain pending.' }
+        } catch {
+            Write-Host ('Could not release NanaZip shell host ' + $candidate.ProcessId + '; update may remain pending. ' + $_.Exception.Message)
+        }
+    }
+}
 $logPath = Join-Path $PSScriptRoot ('Install-' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '.log')
 Start-Transcript -LiteralPath $logPath -Force | Out-Null
 try {
@@ -46,6 +81,7 @@ try {
     Write-Host 'Installing the bundle signing certificate into LocalMachine/TrustedPeople.'
     Import-Certificate -FilePath $certificatePath -CertStoreLocation 'Cert:\LocalMachine\TrustedPeople' | Out-Null
     Write-Host ('Updating NanaZip Preview with MSIXBundle ' + $info.Version + ' ...')
+    if ($current -and [version]$current.Version -lt [version]$info.Version) { Stop-IdleNanaZipShellHosts $current }
     Add-AppxPackage -Path $packagePath -DeferRegistrationWhenPackagesAreInUse -ErrorAction Stop
     $installed = Get-AppxPackage -Name $info.PackageIdentity | Select-Object -First 1
     $bundle = Get-AppxPackage -Name $info.PackageIdentity -PackageTypeFilter Bundle | Select-Object -First 1

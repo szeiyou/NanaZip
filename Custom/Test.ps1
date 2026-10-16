@@ -15,6 +15,8 @@ Invoke-CustomNative 'powershell.exe' @('-NoProfile','-ExecutionPolicy','Bypass',
     (Join-Path $script:CustomRepoRoot 'Tests\CustomBuildTests.ps1'))
 Invoke-CustomNative 'powershell.exe' @('-NoProfile','-ExecutionPolicy','Bypass','-File',
     (Join-Path $script:CustomRepoRoot 'Tests\InstallerRegistrationTests.ps1'))
+Invoke-CustomNative 'powershell.exe' @('-NoProfile','-ExecutionPolicy','Bypass','-File',
+    (Join-Path $script:CustomRepoRoot 'Tests\InstallerShellHostTests.ps1'))
 Invoke-CustomNative $tools.Python @((Join-Path $script:CustomRepoRoot 'Tests\ZipParallelTests.py'), $console)
 $fixture = Join-Path $testRoot 'callback-fixture.zip'
 Invoke-CustomNative $tools.Python @((Join-Path $PSScriptRoot 'MakeTestArchive.py'), $fixture)
