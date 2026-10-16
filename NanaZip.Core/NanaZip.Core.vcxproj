@@ -397,6 +397,7 @@
     <ClInclude Include="SevenZip\CPP\7zip\Archive\Zip\ZipAddCommon.h" />
     <ClInclude Include="SevenZip\CPP\7zip\Archive\Zip\ZipCompressionMode.h" />
     <ClInclude Include="SevenZip\CPP\7zip\Archive\Zip\ZipHandler.h" />
+    <ClInclude Include="SevenZip\CPP\7zip\Archive\Zip\ZipExtractMt.h" />
     <ClInclude Include="SevenZip\CPP\7zip\Archive\Zip\ZipHeader.h" />
     <ClInclude Include="SevenZip\CPP\7zip\Archive\Zip\ZipIn.h" />
     <ClInclude Include="SevenZip\CPP\7zip\Archive\Zip\ZipItem.h" />

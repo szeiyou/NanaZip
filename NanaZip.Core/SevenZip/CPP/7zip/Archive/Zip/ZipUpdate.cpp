@@ -1270,7 +1270,22 @@ static HRESULT Update2(
   CUIntVector threadIndices;  // list threads in order of updateItems
 
   {
-    RINOK(memManager.AllocateSpaceAlways((size_t)numThreads * (kMemPerThread / kBlockSize)))
+    // Large, weakly compressible files can exhaust the encode-ahead buffers
+    // while waiting for an earlier ZIP member to finish. Keep more workers
+    // active without changing the compression method or output ordering.
+    UInt64 bufferSize = (UInt64)numThreads * kMemPerThread;
+    if (numFilesToCompress != 0
+        && (method == NFileHeader::NCompressionMethod::kDeflate
+            || method == NFileHeader::NCompressionMethod::kDeflate64))
+    {
+      const UInt64 averageSize = numBytesToCompress / numFilesToCompress;
+      const UInt64 perThread = averageSize >= ((UInt64)64 << 20) ?
+          ((UInt64)128 << 20) : MyMax((UInt64)kMemPerThread, averageSize * 2);
+      const UInt64 budget = MyMin((UInt64)2 << 30, options._memUsage_Compress / 8);
+      if (budget > bufferSize)
+        bufferSize = MyMin(budget, (UInt64)numThreads * perThread);
+    }
+    RINOK(memManager.AllocateSpaceAlways((size_t)(bufferSize / kBlockSize)))
     for (i = 0; i < updateItems.Size(); i++)
       refs.Refs.Add(CMemBlocks2());
 

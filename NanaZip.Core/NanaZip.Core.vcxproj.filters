@@ -1624,6 +1624,9 @@
     <ClInclude Include="SevenZip\CPP\7zip\Archive\Zip\ZipHandler.h">
       <Filter>SevenZip\CPP\7zip\Archive\Zip</Filter>
     </ClInclude>
+    <ClInclude Include="SevenZip\CPP\7zip\Archive\Zip\ZipExtractMt.h">
+      <Filter>SevenZip\CPP\7zip\Archive\Zip</Filter>
+    </ClInclude>
     <ClInclude Include="SevenZip\CPP\7zip\Archive\Zip\ZipHeader.h">
       <Filter>SevenZip\CPP\7zip\Archive\Zip</Filter>
     </ClInclude>

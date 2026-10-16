@@ -17,6 +17,12 @@
 #include "../../Common/StreamObjects.h"
 #include "../../Common/StreamUtils.h"
 
+#if defined(_WIN32) && !defined(Z7_ST)
+#include <atomic>
+#include "../../../Windows/Thread.h"
+#include "../../Common/OutMemStream.h"
+#endif
+
 #include "../../Compress/CopyCoder.h"
 #ifndef Z7_ZIP_LZFSE_DISABLE
 #include "../../Compress/LzfseDecoder.h"
@@ -881,7 +887,7 @@ public:
     #ifndef Z7_ST
     UInt32 numThreads, UInt64 memUsage,
     #endif
-    Int32 &res);
+    Int32 &res, ISequentialInStream *preparedStream = NULL);
 };
 
 
@@ -981,7 +987,7 @@ HRESULT CZipDecoder::Decode(
     #ifndef Z7_ST
     UInt32 numThreads, UInt64 memUsage,
     #endif
-    Int32 &res)
+    Int32 &res, ISequentialInStream *preparedStream)
 {
   res = NExtract::NOperationResult::kHeadersError;
   
@@ -1050,7 +1056,12 @@ HRESULT CZipDecoder::Decode(
         return S_OK;
       packSize -= NCrypto::NWzAes::kMacSize;
     }
-    RINOK(archive.GetItemStream(item, true, packStream))
+    if (preparedStream)
+      packStream = preparedStream;
+    else
+    {
+      RINOK(archive.GetItemStream(item, true, packStream))
+    }
     if (!packStream)
     {
       res = NExtract::NOperationResult::kUnavailable;
@@ -1634,6 +1645,10 @@ HRESULT CZipDecoder::Decode(
 }
 
 
+#if defined(_WIN32) && !defined(Z7_ST)
+#include "ZipExtractMt.h"
+#endif
+
 Z7_COM7F_IMF(CHandler::Extract(const UInt32 *indices, UInt32 numItems,
     Int32 testMode, IArchiveExtractCallback *extractCallback))
 {
@@ -1652,6 +1667,16 @@ Z7_COM7F_IMF(CHandler::Extract(const UInt32 *indices, UInt32 numItems,
     // totalPacked += item.PackSize;
   }
   RINOK(extractCallback->SetTotal(total))
+
+#if defined(_WIN32) && !defined(Z7_ST)
+  bool parallelUsed = false;
+  const HRESULT parallelResult = ExtractZipMt(
+      EXTERNAL_CODECS_VARS
+      m_Archive, m_Items, indices, numItems, allFilesMode,
+      testMode, extractCallback, _props, parallelUsed);
+  if (parallelUsed)
+    return parallelResult;
+#endif
 
   CZipDecoder myDecoder;
   UInt64 cur_Unpacked, cur_Packed;
