@@ -93,6 +93,8 @@ if (-not $SkipTests) {
         (Join-Path $binaryRoot 'ArchivePreviewProbe.exe'),(Join-Path $payload 'NanaZip.Core.dll'),
         (Join-Path $payload 'NanaZip.Universal.Console.exe'),(Join-Path $binaryRoot 'ShellPreviewTests.exe'),
         (Join-Path $payload 'NanaZip.ShellExtension.dll'))
+    & (Join-Path $script:CustomRepoRoot 'Tests\BuildShellExtractionTests.ps1') -InterfaceDirectory $payload `
+        -ShellDllPath (Join-Path $payload 'NanaZip.ShellExtension.dll')
 }
 $inner = Join-Path $bundleInput ('NanaZip-Custom-' + $Version + '-x64.msix')
 $packageName = 'NanaZip-Custom-' + $Version + '-x64.msixbundle'

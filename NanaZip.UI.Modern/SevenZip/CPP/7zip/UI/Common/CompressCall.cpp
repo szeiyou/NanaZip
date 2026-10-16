@@ -52,9 +52,16 @@ extern HWND g_HWND;
 
 UString GetQuotedString(const UString &s)
 {
+  // Keep trailing backslashes outside the closing quote. Both the upstream
+  // 7-Zip parser and the retained 7-Zip ZS GUI then read exactly the same path:
+  // "C:\output dir"\ instead of "C:\output dir\" (escaped quote in ZS).
+  unsigned end = s.Len();
+  while (end != 0 && s[end - 1] == L'\\')
+    --end;
   UString s2 ('\"');
-  s2 += s;
+  s2 += s.Left(end);
   s2 += '\"';
+  s2 += s.Ptr(end);
   return s2;
 }
 

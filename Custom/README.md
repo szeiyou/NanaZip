@@ -19,6 +19,10 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Custom\Build.ps1
 版本选择与安装状态测试，再生成已签名 Bundle。打包前还会验证保留的官方命令行
 搭配新核心的兼容性。任何失败均停止，latest 仅在产物验证完成后更新。
 
+打包还必须通过真实右键解压入口测试：四个解压菜单命令调用、共享文件列表、
+保留 GUI 与当前命令行的真实解压，覆盖单选/多选和中文空格路径。
+该检查补上“菜单能列出、命令行能解压，但菜单启动 GUI 时参数不兼容”的缺口。
+
 ```text
 Output/Custom/latest.json                         最近一次完整产物的路径与来源
 Output/Custom/<版本>/NanaZip-Custom-...zip          安装 ZIP
