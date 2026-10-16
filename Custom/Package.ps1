@@ -44,13 +44,45 @@ foreach ($runtime in @('NanaZip.Core.dll','NanaZip.Codecs.dll','NanaZip.ZS.Codec
     $runtimeHashes[$runtime] = (Get-FileHash -LiteralPath $built -Algorithm SHA256).Hash
 }
 $interfaceHashes = [ordered]@{}
-foreach ($file in @('NanaZip.Modern.FileManager.exe','NanaZip.Modern.dll','NanaZip.Universal.Console.exe','K7Base.dll','K7User.dll','resources.pri')) {
+$sourceInterfaceHashes = [ordered]@{}
+foreach ($file in @('NanaZip.Modern.FileManager.exe','NanaZip.Universal.Windows.exe','NanaZip.Core.Windows.sfx',
+    'NanaZip.Modern.dll','NanaZip.Universal.Console.exe','K7Base.dll','K7User.dll','resources.pri')) {
     $path = Join-Path $interfaceRoot $file
     if (-not (Test-Path -LiteralPath $path)) { throw ('Interface source is incomplete: ' + $file) }
-    $interfaceHashes[$file] = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash
+    $sourceInterfaceHashes[$file] = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash
+    if ($file -notin @('NanaZip.Modern.FileManager.exe','NanaZip.Universal.Windows.exe','NanaZip.Core.Windows.sfx')) {
+        $interfaceHashes[$file] = $sourceInterfaceHashes[$file]
+    }
+}
+if (-not $SkipTests) {
+    Invoke-CustomNative $tools.Python @((Join-Path $script:CustomRepoRoot 'Tests\IconResourceTests.py'), $interfaceRoot)
+}
+$brandingHashes = [ordered]@{}
+# Preserve PRI resource keys/qualifiers and package identity, replacing their
+# image data with the matching official release assets from this checkout.
+$assetRoot = Join-Path $script:CustomRepoRoot 'Assets\PackageAssets'
+$assetTarget = Join-Path $payload 'Assets'
+$releaseAssets = @(Get-ChildItem -LiteralPath $assetRoot -File)
+$existingAssets = @(Get-ChildItem -LiteralPath $assetTarget -File)
+if (@(Compare-Object ($releaseAssets.Name | Sort-Object) ($existingAssets.Name | Sort-Object)).Count) {
+    throw 'Release and interface image asset names differ; review PRI mappings before branding.'
+}
+foreach ($asset in $releaseAssets) {
+    Copy-Item -LiteralPath $asset.FullName -Destination (Join-Path $assetTarget $asset.Name) -Force
+    $brandingHashes['Assets/' + $asset.Name] = (Get-FileHash -LiteralPath $asset.FullName -Algorithm SHA256).Hash
+}
+foreach ($file in @('NanaZip.Modern.FileManager.exe','NanaZip.Universal.Windows.exe','NanaZip.Core.Windows.sfx')) {
+    $icon = if ($file -like '*.sfx') { 'NanaZipSfx.ico' } else { 'NanaZip.ico' }
+    $path = Join-Path $payload $file
+    Invoke-CustomNative $tools.Python @((Join-Path $PSScriptRoot 'SetExecutableIcon.py'), $path,
+        (Join-Path $script:CustomRepoRoot ('Assets\' + $icon)))
+    $brandingHashes[$file] = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash
 }
 $manifest.Package.Identity.Version = $Version.ToString()
-$manifest.Package.Properties.DisplayName = 'NanaZip Preview Custom ZIP'
+$manifest.Package.Properties.DisplayName = 'NanaZip'
+foreach ($element in $manifest.SelectNodes('//*[@DisplayName]')) {
+    if ($element.GetAttribute('DisplayName') -like 'NanaZip Preview*') { $element.SetAttribute('DisplayName','NanaZip') }
+}
 $manifest.Save((Join-Path $payload 'AppxManifest.xml'))
 # Check the retained official console with the newly compiled runtime before packing.
 if (-not $SkipTests) {
@@ -62,8 +94,8 @@ if (-not $SkipTests) {
         (Join-Path $payload 'NanaZip.Universal.Console.exe'),(Join-Path $binaryRoot 'ShellPreviewTests.exe'),
         (Join-Path $payload 'NanaZip.ShellExtension.dll'))
 }
-$inner = Join-Path $bundleInput ('NanaZipPreview-Custom-' + $Version + '-x64.msix')
-$packageName = 'NanaZipPreview-Custom-' + $Version + '-x64.msixbundle'
+$inner = Join-Path $bundleInput ('NanaZip-Custom-' + $Version + '-x64.msix')
+$packageName = 'NanaZip-Custom-' + $Version + '-x64.msixbundle'
 $packagePath = Join-Path $distribution $packageName
 Invoke-CustomNative $tools.MakeAppx @('pack','/d',$payload,'/p',$inner,'/o')
 Invoke-CustomNative $tools.MakeAppx @('bundle','/d',$bundleInput,'/p',$packagePath,'/bv',$Version.ToString(),'/o')
@@ -89,6 +121,8 @@ $details = [ordered]@{
     SourceDirty=$record.SourceDirty; SourceFingerprint=$record.SourceFingerprint; BuiltAtUtc=[DateTime]::UtcNow.ToString('o')
     InterfaceSourceVersion=$sourceVersion; InterfaceSource='Existing modern Preview GUI/resources; shell and archive runtime built from source'
     RuntimeSHA256=$runtimeHashes; PreservedInterfaceSHA256=$interfaceHashes
+    SourceInterfaceSHA256=$sourceInterfaceHashes; BrandingSHA256=$brandingHashes
+    DisplayName='NanaZip'; Branding='Official release PNG/ICO assets; Preview package identity retained for in-place updates'
     OptimizedCoreSHA256=$runtimeHashes['NanaZip.Core.dll']; RegressionTestsRun=((-not $SkipTests) -and $record.FullRegressionTestsPassed)
     ActualInstallationTested=$false
 }
@@ -98,7 +132,7 @@ if (-not $SkipTests) {
     Invoke-CustomNative $tools.Python @((Join-Path $script:CustomRepoRoot 'Tests\PackageIntegrityTests.py'), $distribution)
 }
 Add-Type -AssemblyName System.IO.Compression.FileSystem
-$archive = Join-Path $buildRoot ('NanaZipPreview-Custom-' + $Version + '-Windows-x64.zip')
+$archive = Join-Path $buildRoot ('NanaZip-Custom-' + $Version + '-Windows-x64.zip')
 [IO.Compression.ZipFile]::CreateFromDirectory($distribution, $archive)
 $zip = [IO.Compression.ZipFile]::OpenRead($archive)
 try {

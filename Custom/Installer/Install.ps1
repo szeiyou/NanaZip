@@ -76,11 +76,11 @@ try {
     }
     $current = Get-AppxPackage -Name $info.PackageIdentity | Select-Object -First 1
     if ($current -and [version]$current.Version -gt [version]$info.Version) {
-        throw 'A newer NanaZip Preview is installed. This installer will not downgrade it.'
+        throw 'A newer NanaZip is installed. This installer will not downgrade it.'
     }
     Write-Host 'Installing the bundle signing certificate into LocalMachine/TrustedPeople.'
     Import-Certificate -FilePath $certificatePath -CertStoreLocation 'Cert:\LocalMachine\TrustedPeople' | Out-Null
-    Write-Host ('Updating NanaZip Preview with MSIXBundle ' + $info.Version + ' ...')
+    Write-Host ('Updating NanaZip with MSIXBundle ' + $info.Version + ' ...')
     if ($current -and [version]$current.Version -lt [version]$info.Version) { Stop-IdleNanaZipShellHosts $current }
     Add-AppxPackage -Path $packagePath -DeferRegistrationWhenPackagesAreInUse -ErrorAction Stop
     $installed = Get-AppxPackage -Name $info.PackageIdentity | Select-Object -First 1

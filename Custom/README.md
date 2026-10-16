@@ -21,7 +21,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Custom\Build.ps1
 
 ```text
 Output/Custom/latest.json                         最近一次完整产物的路径与来源
-Output/Custom/<版本>/NanaZipPreview-Custom-...zip   安装 ZIP
+Output/Custom/<版本>/NanaZip-Custom-...zip          安装 ZIP
 Output/Custom/<版本>/Distribution/                安装文件
 Output/Custom/<版本>/Payload/                     本次打包暂存文件
 Output/Custom/Logs/                               MSBuild 日志
@@ -54,6 +54,13 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Custom\Build.ps1 -Vers
 Core、Codecs、ZS.Codecs 和 ShellExtension 四个 DLL。
 右键扩展通过动态包装器复用 Modern DLL，不依赖重新生成 XAML 工程。
 “关于”可能仍显示来源版本，包版本以 build-info.json 为准。
+
+自用包的显示名称和右键菜单标题为 **NanaZip**，开始菜单、文件关联、窗口、右键菜单
+及自解压程序使用仓库中的正式版 PNG/ICO 图标。打包时只更新复用 EXE 的图标资源；
+回归检查确保程序代码/数据不变，并在 build-info.json 分开记录原始界面哈希、
+保留文件哈希及图标替换后的文件哈希。相同资源键及 PRI 保留。
+内部 Identity 和菜单 COM 类仍沿用 Preview，以便覆盖升级并保留现有应用数据；
+这不改变上游代码所属的预览通道，“关于”中的来源版本说明仍保留。
 
 可以固定一个界面来源目录，保留该目录及版本以便复现：
 

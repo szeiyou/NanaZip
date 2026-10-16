@@ -28,6 +28,7 @@ int wmain(int argc, wchar_t** argv)
     if (root->GetState(selection,FALSE,&state) != E_PENDING) return 7;
     LPWSTR title = nullptr;
     if (FAILED(root->GetTitle(selection,&title))) return 8;
+    if (!title || std::wstring(title) != L"NanaZip") return 16;
     CoTaskMemFree(title);
     // A host can enumerate before the slow result, then enumerate again.
     // That early query must not permanently suppress the preview.

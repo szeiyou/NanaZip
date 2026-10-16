@@ -1,4 +1,4 @@
-NanaZip Preview 自用 ZIP 优化版（Windows x64，现代界面）
+NanaZip 自用 ZIP 优化版（Windows x64，现代界面）
 
 安装：
 1. 将整个 ZIP 解压到新目录。

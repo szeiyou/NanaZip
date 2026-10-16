@@ -61,7 +61,15 @@ with zipfile.ZipFile(package) as bundle:
             assert app_identity[key] == identity[key], key
         assert app_identity['ProcessorArchitecture'] == 'x64'
         assert info['RuntimeSHA256']['NanaZip.Core.dll'] == info['OptimizedCoreSHA256']
-        for group in ('RuntimeSHA256', 'PreservedInterfaceSHA256'):
+        groups = ['RuntimeSHA256', 'PreservedInterfaceSHA256']
+        if 'BrandingSHA256' in info:
+            groups.append('BrandingSHA256')
+        for group in groups:
             for name, expected in info[group].items():
                 assert hashlib.sha256(inner.read(name)).hexdigest().upper() == expected, name
+        if 'BrandingSHA256' in info:
+            assert app.find(ans + 'Properties').find(ans + 'DisplayName').text == 'NanaZip'
+            uns = '{http://schemas.microsoft.com/appx/manifest/uap/windows10}'
+            for application in app.find(ans + 'Applications'):
+                assert application.find(uns + 'VisualElements').attrib['DisplayName'] == 'NanaZip'
 print(f'PASS: bundle/app identities, x64, {bundle_count}/{app_count} block-map files, runtime and preserved interface hashes.')
