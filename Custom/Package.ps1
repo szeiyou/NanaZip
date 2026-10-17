@@ -68,8 +68,14 @@ if (@(Compare-Object ($releaseAssets.Name | Sort-Object) ($existingAssets.Name |
     throw 'Release and interface image asset names differ; review PRI mappings before branding.'
 }
 foreach ($asset in $releaseAssets) {
-    Copy-Item -LiteralPath $asset.FullName -Destination (Join-Path $assetTarget $asset.Name) -Force
-    $brandingHashes['Assets/' + $asset.Name] = (Get-FileHash -LiteralPath $asset.FullName -Algorithm SHA256).Hash
+    $assetSource = $asset.FullName
+    # Keep ArchiveFile PRI keys and sizes, but use the blue application logo.
+    if ($asset.Name -match '^ArchiveFile\.targetsize-(\d+)\.png$') {
+        $assetSource = Join-Path $assetRoot ('Square44x44Logo.targetsize-' + $Matches[1] + '_altform-unplated.png')
+        if (-not (Test-Path -LiteralPath $assetSource)) { throw ('Missing archive logo source: ' + $assetSource) }
+    }
+    Copy-Item -LiteralPath $assetSource -Destination (Join-Path $assetTarget $asset.Name) -Force
+    $brandingHashes['Assets/' + $asset.Name] = (Get-FileHash -LiteralPath $assetSource -Algorithm SHA256).Hash
 }
 foreach ($file in @('NanaZip.Modern.FileManager.exe','NanaZip.Universal.Windows.exe','NanaZip.Core.Windows.sfx')) {
     $icon = if ($file -like '*.sfx') { 'NanaZipSfx.ico' } else { 'NanaZip.ico' }
@@ -124,7 +130,7 @@ $details = [ordered]@{
     InterfaceSourceVersion=$sourceVersion; InterfaceSource='Existing modern Preview GUI/resources; shell and archive runtime built from source'
     RuntimeSHA256=$runtimeHashes; PreservedInterfaceSHA256=$interfaceHashes
     SourceInterfaceSHA256=$sourceInterfaceHashes; BrandingSHA256=$brandingHashes
-    DisplayName='NanaZip'; Branding='Official release PNG/ICO assets; Preview package identity retained for in-place updates'
+    DisplayName='NanaZip'; Branding='Official release PNG/ICO assets; archive file icons use blue application logo; Preview package identity retained for in-place updates'
     OptimizedCoreSHA256=$runtimeHashes['NanaZip.Core.dll']; RegressionTestsRun=((-not $SkipTests) -and $record.FullRegressionTestsPassed)
     ActualInstallationTested=$false
 }

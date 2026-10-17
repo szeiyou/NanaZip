@@ -60,7 +60,9 @@ Core、Codecs、ZS.Codecs 和 ShellExtension 四个 DLL。
 “关于”可能仍显示来源版本，包版本以 build-info.json 为准。
 
 自用包的显示名称和右键菜单标题为 **NanaZip**，开始菜单、文件关联、窗口、右键菜单
-及自解压程序使用仓库中的正式版 PNG/ICO 图标。打包时只更新复用 EXE 的图标资源；
+及自解压程序使用仓库中的正式版 PNG/ICO 图标。压缩包关联图标使用蓝色应用 Logo，
+覆盖 16–1024 像素的全部 28 个尺寸，保留原 ArchiveFile 资源键及 PRI 映射。
+打包时只更新复用 EXE 的图标资源；
 回归检查确保程序代码/数据不变，并在 build-info.json 分开记录原始界面哈希、
 保留文件哈希及图标替换后的文件哈希。相同资源键及 PRI 保留。
 内部 Identity 和菜单 COM 类仍沿用 Preview，以便覆盖升级并保留现有应用数据；
